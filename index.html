@@ -85,6 +85,7 @@ button,select,input{font:inherit;color:inherit}
   <h1>محرر PDF</h1>
   <button class="b p" id="bOpen">فتح ملفات</button>
   <button class="b" id="bAdd" disabled>إضافة ملف / دمج</button>
+  <button class="b" id="bClose" disabled>إغلاق الملف</button>
   <button class="b" id="bBlank" disabled>صفحة فارغة</button>
   <span class="sp"></span>
   <button class="b p" id="bSave" disabled>حفظ PDF</button>
@@ -131,6 +132,11 @@ button,select,input{font:inherit;color:inherit}
   <h3>ارسم توقيعك</h3>
   <canvas id="pad" width="1040" height="400"></canvas>
   <div class="row"><button class="b p" id="sOk">إدراج التوقيع</button><button class="b" id="sClr">مسح</button><button class="b" id="sNo">إلغاء</button></div>
+</div></div>
+<div class="modal" id="mClose"><div class="box">
+  <h3>عندك تعديلات ما انحفظت</h3>
+  <p style="margin:0;color:var(--mute)">إذا أغلقت الملف الحين، بتضيع التعديلات.</p>
+  <div class="row"><button class="b p" id="cSave">احفظ ثم أغلق</button><button class="b" id="cClose">أغلق بدون حفظ</button><button class="b" id="cNo">رجوع</button></div>
 </div></div>
 <div class="toast" id="toast"></div>
 <div class="busy" id="busy">جاري العمل...</div>
@@ -203,12 +209,13 @@ async function addFiles(files){
   if(!S.pages.length)return;
   if(first||S.cur<0)S.cur=0;
   ui();await thumbs();await show();
+  if(first)S.savedKey=stateKey();
   if(!first)toast('تمت إضافة الصفحات في آخر الملف');
 }
 
 function ui(){
   const has=S.pages.length>0;
-  ['#bAdd','#bBlank','#bSave','#bSplit','#bImg','#bWord','#bWord2'].forEach(s=>$(s).disabled=!has);
+  ['#bAdd','#bClose','#bBlank','#bSave','#bSplit','#bImg','#bWord','#bWord2'].forEach(s=>$(s).disabled=!has);
   $('#side').hidden=$('#tools').hidden=$('#stage').hidden=!has;$('#hint').hidden=!has||S.tool!=='edit';$('#empty').hidden=has;
 }
 
@@ -421,6 +428,17 @@ async function liftRegion(b){
     drawOverlays();toast('اسحب الباركود لمكانه الجديد، وكبّره أو صغّره من الدائرة الحمراء');
   }finally{busy(0)}
 }
+
+const stateKey=()=>JSON.stringify(S.pages.map(p=>[p.src,p.idx,p.rot,p.ov.map(o=>[o.type,o.x,o.y,o.w,o.h,o.text,o.size,o.color,o.bold])]));
+function closeFile(){
+  for(const x of S.sources)try{x.doc.destroy()}catch(e){}
+  S.sources=[];S.pages=[];S.cur=-1;S.sel=null;S.tsz=[];S.imgBoxes=[];S.savedKey=null;
+  $('#side').innerHTML='';$('#layer').innerHTML='';$('#mClose').classList.remove('on');ui();toast('تم إغلاق الملف');
+}
+$('#bClose').addEventListener('click',()=>{if(!S.pages.length)return;if(stateKey()!==S.savedKey)$('#mClose').classList.add('on');else closeFile()});
+$('#cNo').addEventListener('click',()=>$('#mClose').classList.remove('on'));
+$('#cClose').addEventListener('click',closeFile);
+$('#cSave').addEventListener('click',async()=>{$('#mClose').classList.remove('on');if(await saveAll())closeFile()});
 // images & signature
 async function placeImage(src){
   const i=await loadImg(src);imgCache[src]=i;const v=S.view;
@@ -497,7 +515,8 @@ const allIdx=()=>S.pages.map((_,i)=>i);
 const chosenIdx=()=>S.pages.map((p,i)=>p.chosen?i:-1).filter(i=>i>=0);
 async function run(fn){busy(1);try{await fn()}catch(e){console.error(e);toast('حدث خطأ: '+(e.message||e))}finally{busy(0)}}
 
-$('#bSave').addEventListener('click',()=>run(async()=>{if(await download(await buildPdf(allIdx()),baseName()+'-معدل.pdf','application/pdf'))toast('تم حفظ الملف في مجلد التنزيلات')}));
+$('#bSave').addEventListener('click',()=>saveAll());
+async function saveAll(){let ok=false;await run(async()=>{if(await download(await buildPdf(allIdx()),baseName()+'-معدل.pdf','application/pdf')){ok=true;S.savedKey=stateKey();toast('تم حفظ الملف في مجلد التنزيلات')}});return ok}
 $('#bSplit').addEventListener('click',()=>{const l=chosenIdx();if(!l.length){toast('حدد الصفحات أولاً من المربعات بجانب أرقام الصفحات');return}run(async()=>{if(await download(await buildPdf(l),baseName()+'-صفحات.pdf','application/pdf'))toast('تم حفظ '+l.length+' صفحة')})});
 $('#bImg').addEventListener('click',()=>run(async()=>{
   const l=chosenIdx().length?chosenIdx():allIdx();const zip=new JSZip();let last;
