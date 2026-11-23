@@ -42,6 +42,8 @@ button,select,input{font:inherit;color:inherit}
 .props label{font-size:13px;color:var(--mute);display:flex;align-items:center;gap:4px}
 .props input[type=number]{width:64px;min-height:36px;padding:0 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:16px}
 .props input[type=color]{width:40px;height:36px;border:1px solid var(--line);border-radius:6px;padding:2px;background:none}
+.hint{padding:8px 14px;background:var(--acc2);color:var(--ink);font-size:14px;border-bottom:1px solid var(--line)}
+.layer.c-edit{cursor:text}
 .stagewrap{flex:1;overflow:auto;padding:20px}
 .stage{position:relative;margin:0 auto;box-shadow:0 4px 20px #0003;background:#fff}
 .stage canvas{display:block}
@@ -95,13 +97,14 @@ button,select,input{font:inherit;color:inherit}
   <aside class="side" id="side" hidden></aside>
   <section class="work">
     <div class="tools" id="tools" hidden>
-      <button class="t on" data-t="select">تحديد وتحريك</button>
-      <button class="t" data-t="text">كتابة نص</button>
+      <button class="t on" data-t="edit">تعديل الكلام</button>
+      <button class="t" data-t="text">إضافة نص</button>
+      <button class="t" data-t="select">تحريك</button>
       <button class="t" data-t="rect">تغطية / مسح</button>
       <button class="t" data-t="hl">تظليل</button>
       <button class="t" id="bSig">توقيع</button>
       <button class="t" id="bPic">إدراج صورة</button>
-      <div class="props" id="props" hidden>
+      <div class="props" id="props" style="visibility:hidden">
         <label id="lSize">الحجم <input type="number" id="pSize" min="5" max="200" value="14"></label>
         <label>اللون <input type="color" id="pColor" value="#000000"></label>
         <button class="t" id="pBold">عريض</button>
@@ -110,6 +113,7 @@ button,select,input{font:inherit;color:inherit}
       <span class="sp"></span>
       <div class="zoom"><button class="t" id="zOut" aria-label="تصغير">−</button><span id="zLbl">100%</span><button class="t" id="zIn" aria-label="تكبير">+</button></div>
     </div>
+    <div class="hint" id="hint" hidden>اضغط على أي كلمة في الملف وعدّلها مباشرة. التغطية والخط والمقاس واللون تنضبط تلقائياً.</div>
     <div class="stagewrap" id="wrap">
       <div class="empty" id="empty">
         <h2>عدّل ملفات PDF وحوّلها</h2>
@@ -136,7 +140,7 @@ button,select,input{font:inherit;color:inherit}
 {
 const $=s=>document.querySelector(s);
 const PJ='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
-const S={sources:[],pages:[],cur:-1,tool:'select',sel:null,zoom:1,view:null,task:null};
+const S={sources:[],pages:[],cur:-1,tool:'edit',sel:null,zoom:1,view:null,task:null};
 const imgCache={};
 let uid=1;
 const FONT='Tahoma, Arial, sans-serif';
@@ -202,7 +206,7 @@ async function addFiles(files){
 function ui(){
   const has=S.pages.length>0;
   ['#bAdd','#bBlank','#bSave','#bSplit','#bImg','#bWord','#bWord2'].forEach(s=>$(s).disabled=!has);
-  $('#side').hidden=$('#tools').hidden=$('#stage').hidden=!has;$('#empty').hidden=has;
+  $('#side').hidden=$('#tools').hidden=$('#stage').hidden=!has;$('#hint').hidden=!has||S.tool!=='edit';$('#empty').hidden=has;
 }
 
 async function renderPage(pg,width){
@@ -248,8 +252,8 @@ async function show(){
   cv.width=Math.round(v.width);cv.height=Math.round(v.height);
   const W=v1.width*s,H=v1.height*s;cv.style.width=W+'px';cv.style.height=H+'px';
   const st=$('#stage');st.style.width=W+'px';st.style.height=H+'px';
-  S.view={w:v1.width,h:v1.height,s};S.tsz=[];
-  p.getTextContent().then(tc=>{if(cur()===pg)S.tsz=tc.items.filter(i=>i.str.trim()).map(i=>{const t=pdfjsLib.Util.transform(v1.transform,i.transform);return {x:t[4],y:t[5],w:i.width,s:Math.hypot(t[2],t[3]),str:i.str}})}).catch(()=>{});
+  S.view={w:v1.width,h:v1.height,s};S.tsz=[];S.pp=p;
+  p.getTextContent().then(tc=>{if(cur()===pg)S.tsz=tc.items.filter(i=>i.str.trim()).map(i=>{const t=pdfjsLib.Util.transform(v1.transform,i.transform);return {x:t[4],y:t[5],w:i.width,s:Math.hypot(t[2],t[3]),str:i.str,fn:i.fontName,rot:Math.abs(t[1])>Math.abs(t[0])*.2}})}).catch(()=>{});
   drawOverlays();
   const ctx=cv.getContext('2d');ctx.direction='ltr';ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
   S.task=p.render({canvasContext:ctx,viewport:v});
@@ -261,7 +265,7 @@ const cur=()=>S.pages[S.cur];
 const find=id=>cur()?.ov.find(o=>o.id===id);
 
 function nodeHTML(o){
-  if(o.type==='text')return `<div class="grip">اسحب</div><textarea dir="auto" spellcheck="false"></textarea><div class="hd"></div>`;
+  if(o.type==='text')return `<div class="grip">اسحب</div><textarea dir="${o.dir||'auto'}" spellcheck="false"></textarea><div class="hd"></div>`;
   return `<div class="hd"></div>`;
 }
 function styleNode(n,o){
@@ -280,16 +284,16 @@ const nodeOf=o=>$(`#layer .ov[data-id="${o.id}"]`);
 
 function select(id){S.sel=id;document.querySelectorAll('#layer .ov').forEach(n=>n.classList.toggle('sel',+n.dataset.id===id));props()}
 function props(){
-  const o=S.sel&&find(S.sel);$('#props').hidden=!o;if(!o)return;
-  const t=o.type==='text';$('#lSize').hidden=!t;$('#pBold').hidden=!t;
-  $('#pColor').parentElement.hidden=!(t||o.type==='rect');
+  const o=S.sel&&find(S.sel);const v=(el,on)=>el.style.visibility=on?'visible':'hidden';v($('#props'),o);if(!o)return;
+  const t=o.type==='text';v($('#lSize'),t);v($('#pBold'),t);
+  v($('#pColor').parentElement,t||o.type==='rect');
   if(t)$('#pSize').value=o.size;if(o.color)$('#pColor').value=o.color;
   $('#pBold').classList.toggle('on',!!o.bold);
 }
 
 function fitText(o){const n=nodeOf(o);if(!n)return;const ta=n.querySelector('textarea');const L=$('#layer');ta.style.height='0';const h=ta.scrollHeight;ta.style.height='';o.h=Math.max(o.h,(h+2)/L.clientHeight);n.style.height=o.h*100+'%'}
 
-$('#tools').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;S.tool=b.dataset.t;document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===b));$('#layer').className='layer c-'+S.tool});
+$('#tools').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;S.tool=b.dataset.t;document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===b));$('#layer').className='layer c-'+S.tool;$('#hint').hidden=S.tool!=='edit'});
 
 // pointer interactions
 let drag=null;
@@ -297,7 +301,7 @@ $('#layer').addEventListener('pointerdown',e=>{
   const L=$('#layer'),R=L.getBoundingClientRect();
   const fx=(e.clientX-R.left)/R.width,fy=(e.clientY-R.top)/R.height;
   let n=e.target.closest('.ov');
-  if(n&&S.tool!=='select'){const t=find(+n.dataset.id)?.type;if(!(S.tool==='text'&&t==='text'))n=null}
+  if(n&&S.tool!=='select'){const t=find(+n.dataset.id)?.type;if(!((S.tool==='text'||S.tool==='edit')&&t==='text'))n=null}
   if(n){
     const o=find(+n.dataset.id);select(o.id);
     if(e.target.tagName==='TEXTAREA')return;
@@ -306,6 +310,7 @@ $('#layer').addEventListener('pointerdown',e=>{
     return;
   }
   const pg=cur();
+  if(S.tool==='edit'){e.preventDefault();editAt(fx,fy);return}
   if(S.tool==='text'){
     const V=S.view,T=S.tsz||[],px=fx*V.w,py=fy*V.h;let sz=0,ox=Math.min(fx,.95),oy=Math.min(fy,.97),ow=Math.min(.4,1-fx);
     const rd=v=>Math.round(v*2)/2;
@@ -348,6 +353,42 @@ const delSel=()=>{const pg=cur();if(!pg||!S.sel)return;pg.ov=pg.ov.filter(o=>o.i
 $('#pDel').addEventListener('click',delSel);
 document.addEventListener('keydown',e=>{if((e.key==='Delete'||e.key==='Backspace')&&S.sel&&!/TEXTAREA|INPUT/.test(document.activeElement.tagName)){e.preventDefault();delSel()}});
 
+
+function sampleColors(x0,y0,x1,y1){
+  const cv=$('#cv'),k=cv.width/S.view.w,ctx=cv.getContext('2d',{willReadFrequently:true});
+  const X0=Math.max(0,Math.floor(x0*k)),Y0=Math.max(0,Math.floor(y0*k)),X1=Math.min(cv.width,Math.ceil(x1*k)),Y1=Math.min(cv.height,Math.ceil(y1*k));
+  if(X1-X0<2||Y1-Y0<2)return {bg:'#ffffff',fg:'#000000'};
+  const d=ctx.getImageData(X0,Y0,X1-X0,Y1-Y0).data,cnt={};
+  for(let i=0;i<d.length;i+=4){const q=((d[i]>>4)<<8)|((d[i+1]>>4)<<4)|(d[i+2]>>4);cnt[q]=(cnt[q]||0)+1}
+  const top=+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];
+  let br=0,bgc=[0,0,0],n=0;
+  for(let i=0;i<d.length;i+=4){const q=((d[i]>>4)<<8)|((d[i+1]>>4)<<4)|(d[i+2]>>4);if(q===top){bgc[0]+=d[i];bgc[1]+=d[i+1];bgc[2]+=d[i+2];n++}}
+  bgc=bgc.map(v=>v/n);let fg=[0,0,0];
+  for(let i=0;i<d.length;i+=4){const dd=Math.abs(d[i]-bgc[0])+Math.abs(d[i+1]-bgc[1])+Math.abs(d[i+2]-bgc[2]);if(dd>br){br=dd;fg=[d[i],d[i+1],d[i+2]]}}
+  const h=a=>'#'+a.map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
+  return {bg:h(bgc),fg:br>60?h(fg):'#000000'};
+}
+function editAt(fx,fy){
+  const V=S.view,T=(S.tsz||[]).filter(t=>!t.rot),px=fx*V.w,py=fy*V.h,pg=cur();
+  const hit=T.find(t=>px>=t.x-2&&px<=t.x+t.w+2&&py>=t.y-t.s*1.05&&py<=t.y+t.s*.35);
+  if(!hit){toast('ما فيه كلام هنا. لإضافة نص جديد اختر "إضافة نص"');return}
+  const line=T.filter(t=>Math.abs(t.y-hit.y)<Math.min(t.s,hit.s)*.35&&Math.abs(t.s-hit.s)<.8).sort((a,b)=>a.x-b.x);
+  let i=line.indexOf(hit),a=i,b=i;const g=hit.str.trim().length<=2?hit.s*.6:-1;
+  while(a>0&&line[a].x-(line[a-1].x+line[a-1].w)<g)a--;
+  while(b<line.length-1&&line[b+1].x-(line[b].x+line[b].w)<g)b++;
+  const seg=line.slice(a,b+1),rtl=AR.test(seg.map(t=>t.str).join(''));
+  const arr=rtl?[...seg].reverse():seg;let text='';
+  arr.forEach((t,j)=>{if(j){const pv=arr[j-1];const gap=rtl?pv.x-(t.x+t.w):t.x-(pv.x+pv.w);if(gap>t.s*.2&&!/\s$/.test(text)&&!/^\s/.test(t.str))text+=' '}text+=t.str});
+  text=fixAr(text).replace(/\s+/g,' ').trim();
+  const sz=Math.round(hit.s*2)/2,x0=seg[0].x-1,x1=Math.max(...seg.map(t=>t.x+t.w))+1,base=Math.max(...seg.map(t=>t.y)),y0=base-sz*1.0,y1=base+sz*.32;
+  let bold=false;try{const f=S.pp.commonObjs.has(hit.fn)&&S.pp.commonObjs.get(hit.fn);bold=!!f&&(/bold|black|heavy/i.test(f.name||'')||!!f.bold)}catch(e){}
+  const c=sampleColors(x0,y0,x1,y1);
+  const rect={id:uid++,type:'rect',x:x0/V.w,y:y0/V.h,w:(x1-x0)/V.w,h:(y1-y0)/V.h,color:c.bg};
+  const ow=Math.min(1,(x1-x0)/V.w+.1);let ox=rtl?x1/V.w-ow:x0/V.w;ox=Math.max(0,Math.min(1-ow,ox));
+  const o={id:uid++,type:'text',x:ox,y:Math.max(0,(base-baseOff(sz,bold))/V.h),w:ow,h:.03,text,size:sz,color:c.fg,bold,dir:rtl?'rtl':'ltr'};
+  pg.ov.push(rect,o);S.sel=o.id;drawOverlays();fitText(o);
+  setTimeout(()=>{const ta=nodeOf(o)?.querySelector('textarea');if(ta){ta.focus();ta.select()}},0);
+}
 // images & signature
 async function placeImage(src){
   const i=await loadImg(src);imgCache[src]=i;const v=S.view;
@@ -381,16 +422,17 @@ function wrapLines(ctx,text,maxW){
     for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){out.push(line);line=w}else line=t}
     out.push(line)}return out;
 }
-async function overlayCanvas(pg,vw,vh,k,skipText){
+async function overlayCanvas(pg,vw,vh,k,skipText,skipShapes){
   const c=document.createElement('canvas');c.width=Math.round(vw*k);c.height=Math.round(vh*k);const ctx=c.getContext('2d');
   for(const o of pg.ov){
     const x=o.x*c.width,y=o.y*c.height,w=o.w*c.width,h=o.h*c.height;
+    if(skipShapes&&(o.type==='rect'||o.type==='hl'))continue;
     if(o.type==='rect'){ctx.fillStyle=o.color;ctx.fillRect(x,y,w,h)}
     else if(o.type==='hl'){ctx.save();ctx.globalAlpha=.4;ctx.fillStyle='#ffe600';ctx.fillRect(x,y,w,h);ctx.restore()}
     else if(o.type==='img'){const i=imgCache[o.src]||(imgCache[o.src]=await loadImg(o.src));ctx.drawImage(i,x,y,w,h)}
     else if(o.type==='text'&&o.text.trim()&&!skipText){
       const fs=o.size*k;ctx.font=`${o.bold?'bold ':''}${fs}px ${FONT}`;ctx.fillStyle=o.color;ctx.textBaseline='alphabetic';const bo=baseOff(fs,o.bold);
-      const rtl=AR.test(o.text);ctx.direction=rtl?'rtl':'ltr';ctx.textAlign=rtl?'right':'left';
+      const rtl=o.dir?o.dir==='rtl':AR.test(o.text);ctx.direction=rtl?'rtl':'ltr';ctx.textAlign=rtl?'right':'left';
       wrapLines(ctx,o.text,w).forEach((ln,j)=>ctx.fillText(ln,rtl?x+w:x,y+j*fs*1.3+bo));
     }
   }
@@ -405,10 +447,16 @@ async function buildPdf(list){
     const r=norm(pg.base+pg.rot);cp.setRotation(PDFLib.degrees(r));
     if(pg.ov.length){
       const b=cp.getCropBox();const vw=r%180?b.height:b.width,vh=r%180?b.width:b.height;
-      const c=await overlayCanvas(pg,vw,vh,3);
-      const img=await out.embedPng(await (await new Promise(res=>c.toBlob(res,'image/png'))).arrayBuffer());
       const a={0:[b.x,b.y],90:[b.x+b.width,b.y],180:[b.x+b.width,b.y+b.height],270:[b.x,b.y+b.height]}[r]||[b.x,b.y];
-      cp.drawImage(img,{x:a[0],y:a[1],width:vw,height:vh,rotate:PDFLib.degrees(r)});
+      const cs=Math.cos(r*Math.PI/180),sn=Math.sin(r*Math.PI/180);
+      for(const o of pg.ov){if(o.type!=='rect'&&o.type!=='hl')continue;
+        const px=o.x*vw,py=(1-o.y-o.h)*vh,hx=o.color||'#ffffff',col=o.type==='hl'?PDFLib.rgb(1,.9,0):PDFLib.rgb(parseInt(hx.slice(1,3),16)/255,parseInt(hx.slice(3,5),16)/255,parseInt(hx.slice(5,7),16)/255);
+        cp.drawRectangle({x:a[0]+cs*px-sn*py,y:a[1]+sn*px+cs*py,width:o.w*vw,height:o.h*vh,rotate:PDFLib.degrees(r),color:col,opacity:o.type==='hl'?.4:1,borderWidth:0});}
+      if(pg.ov.some(o=>o.type==='text'||o.type==='img')){
+        const c=await overlayCanvas(pg,vw,vh,3,false,true);
+        const img=await out.embedPng(await (await new Promise(res=>c.toBlob(res,'image/png'))).arrayBuffer());
+        cp.drawImage(img,{x:a[0],y:a[1],width:vw,height:vh,rotate:PDFLib.degrees(r)});
+      }
     }
   }
   return out.save();
