@@ -141,6 +141,8 @@ const imgCache={};
 let uid=1;
 const FONT='Tahoma, Arial, sans-serif';
 const AR=/[؀-ۿ]/;
+const _mc=document.createElement('canvas').getContext('2d');
+function baseOff(fs,bold){_mc.font=`${bold?'bold ':''}${fs}px ${FONT}`;const m=_mc.measureText('Hgجـ');const A=m.fontBoundingBoxAscent??fs*.95,D=m.fontBoundingBoxDescent??fs*.25;return (fs*1.3-(A+D))/2+A}
 
 const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),3200)};
 const busy=on=>$('#busy').classList.toggle('on',!!on);
@@ -247,7 +249,7 @@ async function show(){
   const W=v1.width*s,H=v1.height*s;cv.style.width=W+'px';cv.style.height=H+'px';
   const st=$('#stage');st.style.width=W+'px';st.style.height=H+'px';
   S.view={w:v1.width,h:v1.height,s};S.tsz=[];
-  p.getTextContent().then(tc=>{if(cur()===pg)S.tsz=tc.items.filter(i=>i.str.trim()).map(i=>{const t=pdfjsLib.Util.transform(v1.transform,i.transform);return {x:t[4],y:t[5],w:i.width,s:Math.hypot(t[2],t[3])}})}).catch(()=>{});
+  p.getTextContent().then(tc=>{if(cur()===pg)S.tsz=tc.items.filter(i=>i.str.trim()).map(i=>{const t=pdfjsLib.Util.transform(v1.transform,i.transform);return {x:t[4],y:t[5],w:i.width,s:Math.hypot(t[2],t[3]),str:i.str}})}).catch(()=>{});
   drawOverlays();
   const ctx=cv.getContext('2d');ctx.direction='ltr';ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
   S.task=p.render({canvasContext:ctx,viewport:v});
@@ -305,10 +307,19 @@ $('#layer').addEventListener('pointerdown',e=>{
   }
   const pg=cur();
   if(S.tool==='text'){
-    let sz=+$('#pSize').value||14;const px=fx*S.view.w,py=fy*S.view.h;let bd=45;
-    for(const t of S.tsz||[]){const dx=px<t.x?t.x-px:px>t.x+t.w?px-t.x-t.w:0,dy=Math.abs(py-(t.y-t.s*.4)),d=Math.hypot(dx,dy);if(d<bd){bd=d;sz=Math.round(t.s*2)/2}}
+    const V=S.view,T=S.tsz||[],px=fx*V.w,py=fy*V.h;let sz=0,ox=Math.min(fx,.95),oy=Math.min(fy,.97),ow=Math.min(.4,1-fx);
+    const rd=v=>Math.round(v*2)/2;
+    const cov=pg.ov.find(o=>o.type==='rect'&&fx>=o.x&&fx<=o.x+o.w&&fy>=o.y&&fy<=o.y+o.h);
+    if(cov){
+      const under=T.filter(t=>{const cx=(t.x+t.w/2)/V.w,cy=(t.y-t.s*.35)/V.h;return cx>=cov.x&&cx<=cov.x+cov.w&&cy>=cov.y&&cy<=cov.y+cov.h});
+      if(under.length){const t=under.reduce((a,b)=>b.s>a.s?b:a);sz=rd(t.s);oy=Math.max(0,(Math.max(...under.filter(u=>Math.abs(u.s-t.s)<.6).map(u=>u.y))-baseOff(sz))/V.h);
+        ow=Math.min(1,cov.w+.06);const rtl=under.some(u=>AR.test(u.str));ox=rtl?cov.x+cov.w-ow:cov.x;ox=Math.max(0,Math.min(1-ow,ox))}
+    }
+    if(!sz){let bd=60;for(const t of T){const dx=px<t.x?t.x-px:px>t.x+t.w?px-t.x-t.w:0,dy=Math.abs(py-(t.y-t.s*.4)),d=Math.hypot(dx,dy);if(d<bd){bd=d;sz=rd(t.s)}}}
+    if(!sz&&T.length){const c={};T.forEach(t=>{const k=rd(t.s);c[k]=(c[k]||0)+(t.str||'').length});sz=+Object.keys(c).sort((a,b)=>c[b]-c[a])[0]}
+    if(!sz)sz=+$('#pSize').value||12;
     $('#pSize').value=sz;
-    const o={id:uid++,type:'text',x:Math.min(fx,.95),y:Math.min(fy,.97),w:Math.min(.4,1-fx),h:.03,text:'',size:sz,color:'#000000',bold:false};
+    const o={id:uid++,type:'text',x:ox,y:oy,w:ow,h:.03,text:'',size:sz,color:'#000000',bold:false};
     pg.ov.push(o);S.sel=o.id;drawOverlays();fitText(o);e.preventDefault();setTimeout(()=>nodeOf(o)?.querySelector('textarea').focus(),0);return;
   }
   if(S.tool==='rect'||S.tool==='hl'){
@@ -378,9 +389,9 @@ async function overlayCanvas(pg,vw,vh,k,skipText){
     else if(o.type==='hl'){ctx.save();ctx.globalAlpha=.4;ctx.fillStyle='#ffe600';ctx.fillRect(x,y,w,h);ctx.restore()}
     else if(o.type==='img'){const i=imgCache[o.src]||(imgCache[o.src]=await loadImg(o.src));ctx.drawImage(i,x,y,w,h)}
     else if(o.type==='text'&&o.text.trim()&&!skipText){
-      const fs=o.size*k;ctx.font=`${o.bold?'bold ':''}${fs}px ${FONT}`;ctx.fillStyle=o.color;ctx.textBaseline='top';
+      const fs=o.size*k;ctx.font=`${o.bold?'bold ':''}${fs}px ${FONT}`;ctx.fillStyle=o.color;ctx.textBaseline='alphabetic';const bo=baseOff(fs,o.bold);
       const rtl=AR.test(o.text);ctx.direction=rtl?'rtl':'ltr';ctx.textAlign=rtl?'right':'left';
-      wrapLines(ctx,o.text,w).forEach((ln,j)=>ctx.fillText(ln,rtl?x+w:x,y+j*fs*1.3+fs*.15));
+      wrapLines(ctx,o.text,w).forEach((ln,j)=>ctx.fillText(ln,rtl?x+w:x,y+j*fs*1.3+bo));
     }
   }
   return c;
