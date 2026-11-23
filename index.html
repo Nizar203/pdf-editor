@@ -53,6 +53,8 @@ button,select,input{font:inherit;color:inherit}
 .ov.sel{outline-color:var(--acc)}
 .ov.rect{cursor:move}.ov.hl{background:#ffe600;opacity:.4;cursor:move}
 .ov.img{background-size:100% 100%;cursor:move}
+.ov.pick{outline:2px dashed var(--acc)!important;background:#c4262e14}
+.layer.c-move{cursor:crosshair}
 .ov textarea{width:100%;height:100%;border:0;padding:0;margin:0;background:transparent;resize:none;overflow:hidden;font-family:Tahoma,Arial,sans-serif;line-height:1.3;outline:none;display:block}
 .ov.text:hover{outline-color:#c4262e66}.ov.text.sel{outline-color:var(--acc)}.ov.rect:hover,.ov.hl:hover,.ov.img:hover{outline-color:#c4262e66}
 .grip{position:absolute;top:-22px;inset-inline-start:0;height:20px;padding:0 8px;background:var(--acc);color:#fff;font-size:12px;border-radius:4px 4px 0 0;cursor:move;display:none;white-space:nowrap}
@@ -101,6 +103,7 @@ button,select,input{font:inherit;color:inherit}
       <button class="t" data-t="text">إضافة نص</button>
       <button class="t" data-t="select">تحريك</button>
       <button class="t" data-t="rect">تغطية / مسح</button>
+      <button class="t" data-t="move">نقل باركود أو صورة</button>
       <button class="t" data-t="hl">تظليل</button>
       <button class="t" id="bSig">توقيع</button>
       <button class="t" id="bPic">إدراج صورة</button>
@@ -258,6 +261,7 @@ async function show(){
   const ctx=cv.getContext('2d');ctx.direction='ltr';ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
   S.task=p.render({canvasContext:ctx,viewport:v});
   try{await S.task.promise}catch(e){}
+  S.imgBoxes=[];pageImages(p,v1,v1.width,v1.height).then(bx=>{if(cur()===pg)S.imgBoxes=bx.map(b=>({x:b.x0/v1.width,y:b.y0/v1.height,w:(b.x1-b.x0)/v1.width,h:(b.y1-b.y0)/v1.height}))}).catch(()=>{});
   $('#zLbl').textContent=Math.round(S.zoom*100)+'%';
 }
 
@@ -301,7 +305,7 @@ $('#layer').addEventListener('pointerdown',e=>{
   const L=$('#layer'),R=L.getBoundingClientRect();
   const fx=(e.clientX-R.left)/R.width,fy=(e.clientY-R.top)/R.height;
   let n=e.target.closest('.ov');
-  if(n&&S.tool!=='select'){const t=find(+n.dataset.id)?.type;if(!((S.tool==='text'||S.tool==='edit')&&t==='text'))n=null}
+  if(n&&S.tool!=='select'){const t=find(+n.dataset.id)?.type;if(!((S.tool==='text'||S.tool==='edit')&&t==='text')&&!(S.tool==='move'&&t==='img'))n=null}
   if(n){
     const o=find(+n.dataset.id);select(o.id);
     if(e.target.tagName==='TEXTAREA')return;
@@ -327,8 +331,8 @@ $('#layer').addEventListener('pointerdown',e=>{
     const o={id:uid++,type:'text',x:ox,y:oy,w:ow,h:.03,text:'',size:sz,color:'#000000',bold:false};
     pg.ov.push(o);S.sel=o.id;drawOverlays();fitText(o);e.preventDefault();setTimeout(()=>nodeOf(o)?.querySelector('textarea').focus(),0);return;
   }
-  if(S.tool==='rect'||S.tool==='hl'){
-    const o={id:uid++,type:S.tool,x:fx,y:fy,w:0,h:0,color:S.tool==='rect'?'#ffffff':'#ffe600'};
+  if(S.tool==='rect'||S.tool==='hl'||S.tool==='move'){
+    const o={id:uid++,type:S.tool==='move'?'pick':S.tool,x:fx,y:fy,w:0,h:0,color:S.tool==='rect'?'#ffffff':'#ffe600'};
     pg.ov.push(o);S.sel=o.id;drawOverlays();e.preventDefault();L.setPointerCapture(e.pointerId);
     drag={o,mode:'new',sx:fx,sy:fy};return;
   }
@@ -342,7 +346,12 @@ $('#layer').addEventListener('pointermove',e=>{
   else{o.x=Math.min(fx,drag.sx);o.y=Math.min(fy,drag.sy);o.w=Math.abs(fx-drag.sx);o.h=Math.abs(fy-drag.sy)}
   styleNode(nodeOf(o),o);
 });
-const endDrag=()=>{if(!drag)return;const o=drag.o;if(drag.mode==='new'&&(o.w<.005||o.h<.005)){cur().ov=cur().ov.filter(x=>x!==o);S.sel=null;drawOverlays()}else if(o.type==='text')fitText(o);drag=null};
+const endDrag=()=>{if(!drag)return;const o=drag.o;
+  if(o.type==='pick'){const pg=cur();pg.ov=pg.ov.filter(x=>x!==o);S.sel=null;drag=null;drawOverlays();
+    let b=o.w>.01&&o.h>.01?{x:o.x,y:o.y,w:o.w,h:o.h}:(S.imgBoxes||[]).filter(q=>o.x>=q.x&&o.x<=q.x+q.w&&o.y>=q.y&&o.y<=q.y+q.h).sort((a,c)=>a.w*a.h-c.w*c.h)[0];
+    if(!b){toast('ما لقيت صورة أو باركود هنا. اسحب مربع حوله لتحديده');return}
+    if(b.w*b.h>.6){toast('هذي صورة الصفحة كاملة. اسحب مربع حول الباركود بس');return}
+    liftRegion(b);return}if(drag.mode==='new'&&(o.w<.005||o.h<.005)){cur().ov=cur().ov.filter(x=>x!==o);S.sel=null;drawOverlays()}else if(o.type==='text')fitText(o);drag=null};
 $('#layer').addEventListener('pointerup',endDrag);$('#layer').addEventListener('pointercancel',endDrag);
 $('#layer').addEventListener('input',e=>{if(e.target.tagName!=='TEXTAREA')return;const o=find(+e.target.closest('.ov').dataset.id);o.text=e.target.value;fitText(o)});
 
@@ -389,6 +398,29 @@ function editAt(fx,fy){
   pg.ov.push(rect,o);S.sel=o.id;drawOverlays();fitText(o);
   setTimeout(()=>{const ta=nodeOf(o)?.querySelector('textarea');if(ta){ta.focus();ta.select()}},0);
 }
+
+function ringColor(b){
+  const cv=$('#cv'),k=cv.width,K=cv.height,ctx=cv.getContext('2d',{willReadFrequently:true}),cnt={};const px=[];
+  const x0=Math.max(0,Math.floor(b.x*k)-4),y0=Math.max(0,Math.floor(b.y*K)-4),x1=Math.min(k-1,Math.ceil((b.x+b.w)*k)+3),y1=Math.min(K-1,Math.ceil((b.y+b.h)*K)+3);
+  const add=(x,y,w,h)=>{if(w<1||h<1)return;const d=ctx.getImageData(x,y,w,h).data;for(let i=0;i<d.length;i+=4){const q=((d[i]>>4)<<8)|((d[i+1]>>4)<<4)|(d[i+2]>>4);cnt[q]=(cnt[q]||0)+1;px.push([q,d[i],d[i+1],d[i+2]])}};
+  add(x0,y0,x1-x0,3);add(x0,y1-2,x1-x0,3);add(x0,y0,3,y1-y0);add(x1-2,y0,3,y1-y0);
+  const top=+Object.keys(cnt).sort((a,c)=>cnt[c]-cnt[a])[0];let s=[0,0,0],n=0;for(const p of px)if(p[0]===top){s[0]+=p[1];s[1]+=p[2];s[2]+=p[3];n++}
+  return n?'#'+s.map(v=>Math.round(v/n).toString(16).padStart(2,'0')).join(''):'#ffffff';
+}
+async function liftRegion(b){
+  const pg=cur(),V=S.view;busy(1);
+  try{
+    const k=4,c=await renderPage(pg,V.w*k),W=c.width,H=c.height;
+    const cc=document.createElement('canvas');cc.width=Math.max(1,Math.round(b.w*W));cc.height=Math.max(1,Math.round(b.h*H));
+    cc.getContext('2d').drawImage(c,Math.round(b.x*W),Math.round(b.y*H),cc.width,cc.height,0,0,cc.width,cc.height);
+    const src=cc.toDataURL('image/png');imgCache[src]=await loadImg(src);
+    const pad=1/V.w;
+    pg.ov.push({id:uid++,type:'rect',x:Math.max(0,b.x-pad),y:Math.max(0,b.y-pad),w:b.w+2*pad,h:b.h+2*pad,color:ringColor(b)});
+    const o={id:uid++,type:'img',x:b.x,y:b.y,w:b.w,h:b.h,src,crisp:true};pg.ov.push(o);S.sel=o.id;
+    S.tool='select';document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x.dataset.t==='select'));$('#hint').hidden=true;
+    drawOverlays();toast('اسحب الباركود لمكانه الجديد، وكبّره أو صغّره من الدائرة الحمراء');
+  }finally{busy(0)}
+}
 // images & signature
 async function placeImage(src){
   const i=await loadImg(src);imgCache[src]=i;const v=S.view;
@@ -429,7 +461,7 @@ async function overlayCanvas(pg,vw,vh,k,skipText,skipShapes){
     if(skipShapes&&(o.type==='rect'||o.type==='hl'))continue;
     if(o.type==='rect'){ctx.fillStyle=o.color;ctx.fillRect(x,y,w,h)}
     else if(o.type==='hl'){ctx.save();ctx.globalAlpha=.4;ctx.fillStyle='#ffe600';ctx.fillRect(x,y,w,h);ctx.restore()}
-    else if(o.type==='img'){const i=imgCache[o.src]||(imgCache[o.src]=await loadImg(o.src));ctx.drawImage(i,x,y,w,h)}
+    else if(o.type==='img'){const i=imgCache[o.src]||(imgCache[o.src]=await loadImg(o.src));ctx.save();if(o.crisp)ctx.imageSmoothingEnabled=false;ctx.drawImage(i,x,y,w,h);ctx.restore()}
     else if(o.type==='text'&&o.text.trim()&&!skipText){
       const fs=o.size*k;ctx.font=`${o.bold?'bold ':''}${fs}px ${FONT}`;ctx.fillStyle=o.color;ctx.textBaseline='alphabetic';const bo=baseOff(fs,o.bold);
       const rtl=o.dir?o.dir==='rtl':AR.test(o.text);ctx.direction=rtl?'rtl':'ltr';ctx.textAlign=rtl?'right':'left';
