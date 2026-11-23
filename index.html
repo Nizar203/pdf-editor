@@ -54,7 +54,9 @@ button,select,input{font:inherit;color:inherit}
 .ov.rect{cursor:move}.ov.hl{background:#ffe600;opacity:.4;cursor:move}
 .ov.img{background-size:100% 100%;cursor:move}
 .ov.pick{outline:2px dashed var(--acc)!important;background:#c4262e14}
-.layer.c-move{cursor:crosshair}
+.layer.c-move,.layer.c-qr{cursor:crosshair}
+#qrText{width:100%;min-height:80px;font:16px/1.4 Consolas,monospace;direction:ltr;text-align:left;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.qrrow{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}.qrrow canvas{width:120px;height:120px;border:1px solid var(--line);image-rendering:pixelated;flex:none}.qrrow>div{flex:1;min-width:200px}
 .ov textarea{width:100%;height:100%;border:0;padding:0;margin:0;background:transparent;resize:none;overflow:hidden;font-family:Tahoma,Arial,sans-serif;line-height:1.3;outline:none;display:block}
 .ov.text:hover{outline-color:#c4262e66}.ov.text.sel{outline-color:var(--acc)}.ov.rect:hover,.ov.hl:hover,.ov.img:hover{outline-color:#c4262e66}
 .grip{position:absolute;top:-22px;inset-inline-start:0;height:20px;padding:0 8px;background:var(--acc);color:#fff;font-size:12px;border-radius:4px 4px 0 0;cursor:move;display:none;white-space:nowrap}
@@ -105,6 +107,7 @@ button,select,input{font:inherit;color:inherit}
       <button class="t" data-t="select">تحريك</button>
       <button class="t" data-t="rect">تغطية / مسح</button>
       <button class="t" data-t="move">نقل باركود أو صورة</button>
+      <button class="t" data-t="qr">تعديل رابط الباركود</button>
       <button class="t" data-t="hl">تظليل</button>
       <button class="t" id="bSig">توقيع</button>
       <button class="t" id="bPic">إدراج صورة</button>
@@ -133,6 +136,14 @@ button,select,input{font:inherit;color:inherit}
   <canvas id="pad" width="1040" height="400"></canvas>
   <div class="row"><button class="b p" id="sOk">إدراج التوقيع</button><button class="b" id="sClr">مسح</button><button class="b" id="sNo">إلغاء</button></div>
 </div></div>
+<div class="modal" id="mQr"><div class="box">
+  <h3>تعديل رابط الباركود</h3>
+  <div class="qrrow"><canvas id="qrPrev" width="240" height="240"></canvas><div>
+  <label for="qrText" style="font-size:14px;color:var(--mute)">الرابط أو النص داخل الباركود</label>
+  <textarea id="qrText" dir="ltr" spellcheck="false"></textarea>
+  <p id="qrNote" style="font-size:13px;color:var(--mute);margin:6px 0 0"></p></div></div>
+  <div class="row"><button class="b p" id="qOk">إنشاء الباركود</button><button class="b" id="qNo">إلغاء</button></div>
+</div></div>
 <div class="modal" id="mClose"><div class="box">
   <h3>عندك تعديلات ما انحفظت</h3>
   <p style="margin:0;color:var(--mute)">إذا أغلقت الملف الحين، بتضيع التعديلات.</p>
@@ -145,6 +156,8 @@ button,select,input{font:inherit;color:inherit}
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 {
 const $=s=>document.querySelector(s);
@@ -313,6 +326,7 @@ $('#layer').addEventListener('pointerdown',e=>{
   const fx=(e.clientX-R.left)/R.width,fy=(e.clientY-R.top)/R.height;
   let n=e.target.closest('.ov');
   if(n&&S.tool!=='select'){const t=find(+n.dataset.id)?.type;if(!((S.tool==='text'||S.tool==='edit')&&t==='text')&&!(S.tool==='move'&&t==='img'))n=null}
+  if(S.tool==='qr'){const on=e.target.closest('.ov');const oo=on&&find(+on.dataset.id);if(oo&&oo.type==='img'&&oo.qr){e.preventDefault();qrFromOverlay(oo);return}}
   if(n){
     const o=find(+n.dataset.id);select(o.id);
     if(e.target.tagName==='TEXTAREA')return;
@@ -338,8 +352,8 @@ $('#layer').addEventListener('pointerdown',e=>{
     const o={id:uid++,type:'text',x:ox,y:oy,w:ow,h:.03,text:'',size:sz,color:'#000000',bold:false};
     pg.ov.push(o);S.sel=o.id;drawOverlays();fitText(o);e.preventDefault();setTimeout(()=>nodeOf(o)?.querySelector('textarea').focus(),0);return;
   }
-  if(S.tool==='rect'||S.tool==='hl'||S.tool==='move'){
-    const o={id:uid++,type:S.tool==='move'?'pick':S.tool,x:fx,y:fy,w:0,h:0,color:S.tool==='rect'?'#ffffff':'#ffe600'};
+  if(S.tool==='rect'||S.tool==='hl'||S.tool==='move'||S.tool==='qr'){
+    const o={id:uid++,type:(S.tool==='move'||S.tool==='qr')?'pick':S.tool,x:fx,y:fy,w:0,h:0,color:S.tool==='rect'?'#ffffff':'#ffe600'};
     pg.ov.push(o);S.sel=o.id;drawOverlays();e.preventDefault();L.setPointerCapture(e.pointerId);
     drag={o,mode:'new',sx:fx,sy:fy};return;
   }
@@ -358,7 +372,7 @@ const endDrag=()=>{if(!drag)return;const o=drag.o;
     let b=o.w>.01&&o.h>.01?{x:o.x,y:o.y,w:o.w,h:o.h}:(S.imgBoxes||[]).filter(q=>o.x>=q.x&&o.x<=q.x+q.w&&o.y>=q.y&&o.y<=q.y+q.h).sort((a,c)=>a.w*a.h-c.w*c.h)[0];
     if(!b){toast('ما لقيت صورة أو باركود هنا. اسحب مربع حوله لتحديده');return}
     if(b.w*b.h>.6){toast('هذي صورة الصفحة كاملة. اسحب مربع حول الباركود بس');return}
-    liftRegion(b);return}if(drag.mode==='new'&&(o.w<.005||o.h<.005)){cur().ov=cur().ov.filter(x=>x!==o);S.sel=null;drawOverlays()}else if(o.type==='text')fitText(o);drag=null};
+    if(S.tool==='qr')qrRegion(b);else liftRegion(b);return}if(drag.mode==='new'&&(o.w<.005||o.h<.005)){cur().ov=cur().ov.filter(x=>x!==o);S.sel=null;drawOverlays()}else if(o.type==='text')fitText(o);drag=null};
 $('#layer').addEventListener('pointerup',endDrag);$('#layer').addEventListener('pointercancel',endDrag);
 $('#layer').addEventListener('input',e=>{if(e.target.tagName!=='TEXTAREA')return;const o=find(+e.target.closest('.ov').dataset.id);o.text=e.target.value;fitText(o)});
 
@@ -429,7 +443,7 @@ async function liftRegion(b){
   }finally{busy(0)}
 }
 
-const stateKey=()=>JSON.stringify(S.pages.map(p=>[p.src,p.idx,p.rot,p.ov.map(o=>[o.type,o.x,o.y,o.w,o.h,o.text,o.size,o.color,o.bold])]));
+const stateKey=()=>JSON.stringify(S.pages.map(p=>[p.src,p.idx,p.rot,p.ov.map(o=>[o.type,o.x,o.y,o.w,o.h,o.text,o.size,o.color,o.bold,o.src&&o.src.length])]));
 function closeFile(){
   for(const x of S.sources)try{x.doc.destroy()}catch(e){}
   S.sources=[];S.pages=[];S.cur=-1;S.sel=null;S.tsz=[];S.imgBoxes=[];S.savedKey=null;
@@ -439,6 +453,66 @@ $('#bClose').addEventListener('click',()=>{if(!S.pages.length)return;if(stateKey
 $('#cNo').addEventListener('click',()=>$('#mClose').classList.remove('on'));
 $('#cClose').addEventListener('click',closeFile);
 $('#cSave').addEventListener('click',async()=>{$('#mClose').classList.remove('on');if(await saveAll())closeFile()});
+
+let QR=null;
+function darkLight(id,w,h,box){
+  const d=id.data;let lo=[255,255,255,765],hi=[0,0,0,0];
+  for(let y=box.y0;y<box.y1;y+=2)for(let x=box.x0;x<box.x1;x+=2){const i=(y*w+x)*4,s=d[i]+d[i+1]+d[i+2];if(s<lo[3])lo=[d[i],d[i+1],d[i+2],s];if(s>hi[3])hi=[d[i],d[i+1],d[i+2],s]}
+  const h2=a=>'#'+a.slice(0,3).map(v=>v.toString(16).padStart(2,'0')).join('');return {dark:h2(lo),light:h2(hi)};
+}
+function readQr(c){
+  const ctx=c.getContext('2d',{willReadFrequently:true}),id=ctx.getImageData(0,0,c.width,c.height);
+  const code=window.jsQR&&jsQR(id.data,c.width,c.height,{inversionAttempts:'attemptBoth'});if(!code)return null;
+  const L=code.location,xs=[L.topLeftCorner.x,L.topRightCorner.x,L.bottomLeftCorner.x,L.bottomRightCorner.x],ys=[L.topLeftCorner.y,L.topRightCorner.y,L.bottomLeftCorner.y,L.bottomRightCorner.y];
+  const box={x0:Math.max(0,Math.round(Math.min(...xs))),y0:Math.max(0,Math.round(Math.min(...ys))),x1:Math.min(c.width,Math.round(Math.max(...xs))),y1:Math.min(c.height,Math.round(Math.max(...ys)))};
+  return {text:code.data,version:code.version,box,...darkLight(id,c.width,c.height,box)};
+}
+async function qrRegion(b){
+  const pg=cur(),V=S.view;busy(1);
+  try{
+    const k=4,c=await renderPage(pg,V.w*k),W=c.width,H=c.height;let res=null,bb=b;
+    for(const m of [0,.01,.025]){bb={x:Math.max(0,b.x-m),y:Math.max(0,b.y-m),w:Math.min(1,b.w+2*m),h:Math.min(1,b.h+2*m)};
+      const cc=document.createElement('canvas');cc.width=Math.round(bb.w*W);cc.height=Math.round(bb.h*H);cc.getContext('2d').drawImage(c,Math.round(bb.x*W),Math.round(bb.y*H),cc.width,cc.height,0,0,cc.width,cc.height);
+      res=readQr(cc);if(res){res.cw=cc.width;res.ch=cc.height;break}}
+    if(!res){toast('ما قدرت أقرأ الباركود. اسحب مربع حوله بالكامل وجرّب مرة ثانية');return}
+    QR={b:bb,res,target:null};openQr();
+  }finally{busy(0)}
+}
+async function qrFromOverlay(o){
+  const i=imgCache[o.src]||(imgCache[o.src]=await loadImg(o.src));const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext('2d').drawImage(i,0,0);
+  const res=readQr(c);if(!res){toast('ما قدرت أقرأ هذا الباركود');return}
+  res.cw=c.width;res.ch=c.height;if(o.qr)Object.assign(res,{box:o.qr.box,dark:o.qr.dark,light:o.qr.light,version:o.qr.version});
+  QR={b:{x:o.x,y:o.y,w:o.w,h:o.h},res,target:o};openQr();
+}
+function openQr(){$('#qrText').value=QR.res.text;$('#mQr').classList.add('on');qrPreview();setTimeout(()=>$('#qrText').focus(),0)}
+function makeQr(text,version){
+  for(const t of version?[version]:[])for(const ec of ['H','Q','M','L']){try{const q=qrcode(t,ec);q.addData(text,'Byte');q.make();return {q,same:true}}catch(e){}}
+  for(const ec of ['M','L']){try{const q=qrcode(0,ec);q.addData(text,'Byte');q.make();return {q,same:false}}catch(e){}}
+  return null;
+}
+function drawQr(c,q,box,dark,light){
+  const ctx=c.getContext('2d');ctx.fillStyle=light;ctx.fillRect(0,0,c.width,c.height);
+  const n=q.getModuleCount(),mw=(box.x1-box.x0)/n,mh=(box.y1-box.y0)/n;ctx.fillStyle=dark;
+  for(let r=0;r<n;r++)for(let cc=0;cc<n;cc++)if(q.isDark(r,cc)){const x0=Math.round(box.x0+cc*mw),x1=Math.round(box.x0+(cc+1)*mw),y0=Math.round(box.y0+r*mh),y1=Math.round(box.y0+(r+1)*mh);ctx.fillRect(x0,y0,x1-x0,y1-y0)}
+}
+function qrPreview(){
+  const t=$('#qrText').value,p=$('#qrPrev'),m=t?makeQr(t,QR.res.version):null;
+  const ctx=p.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,p.width,p.height);
+  if(!m){$('#qrNote').textContent=t?'الرابط طويل جداً للباركود':'اكتب الرابط';$('#qOk').disabled=true;return}
+  $('#qOk').disabled=false;drawQr(p,m.q,{x0:16,y0:16,x1:224,y1:224},QR.res.dark,QR.res.light);
+  $('#qrNote').textContent=m.same?'بنفس حجم مربعات الباركود الأصلي':'الرابط أطول من الأصلي، فالمربعات بتكون أصغر شوي';
+}
+$('#qrText').addEventListener('input',qrPreview);
+$('#qNo').addEventListener('click',()=>$('#mQr').classList.remove('on'));
+$('#qOk').addEventListener('click',async()=>{
+  const t=$('#qrText').value.trim(),m=makeQr(t,QR.res.version);if(!m)return;
+  const R=QR.res,c=document.createElement('canvas');c.width=R.cw;c.height=R.ch;drawQr(c,m.q,R.box,R.dark,R.light);
+  const src=c.toDataURL('image/png');imgCache[src]=await loadImg(src);const pg=cur();
+  const meta={box:R.box,dark:R.dark,light:R.light,version:R.version};
+  if(QR.target){QR.target.src=src;QR.target.qr=meta;S.sel=QR.target.id}
+  else{const o={id:uid++,type:'img',x:QR.b.x,y:QR.b.y,w:QR.b.w,h:QR.b.h,src,crisp:true,qr:meta};pg.ov.push(o);S.sel=o.id}
+  $('#mQr').classList.remove('on');drawOverlays();toast('تم تغيير رابط الباركود');
+});
 // images & signature
 async function placeImage(src){
   const i=await loadImg(src);imgCache[src]=i;const v=S.view;
