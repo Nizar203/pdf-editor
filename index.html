@@ -102,6 +102,8 @@ button,select,input{font:inherit;color:inherit}
   <aside class="side" id="side" hidden></aside>
   <section class="work">
     <div class="tools" id="tools" hidden>
+      <button class="t" id="bUndo" disabled title="Ctrl+Z">↶ رجوع</button>
+      <button class="t" id="bRedo" disabled title="Ctrl+Y">↷ إعادة</button>
       <button class="t on" data-t="edit">تعديل الكلام</button>
       <button class="t" data-t="text">إضافة نص</button>
       <button class="t" data-t="select">تحريك</button>
@@ -222,7 +224,7 @@ async function addFiles(files){
   if(!S.pages.length)return;
   if(first||S.cur<0)S.cur=0;
   ui();await thumbs();await show();
-  if(first)S.savedKey=stateKey();
+  if(first){S.savedKey=stateKey();histReset()}
   if(!first)toast('تمت إضافة الصفحات في آخر الملف');
 }
 
@@ -446,7 +448,7 @@ async function liftRegion(b){
 const stateKey=()=>JSON.stringify(S.pages.map(p=>[p.src,p.idx,p.rot,p.ov.map(o=>[o.type,o.x,o.y,o.w,o.h,o.text,o.size,o.color,o.bold,o.src&&o.src.length])]));
 function closeFile(){
   for(const x of S.sources)try{x.doc.destroy()}catch(e){}
-  S.sources=[];S.pages=[];S.cur=-1;S.sel=null;S.tsz=[];S.imgBoxes=[];S.savedKey=null;
+  S.sources=[];S.pages=[];S.cur=-1;S.sel=null;S.tsz=[];S.imgBoxes=[];S.savedKey=null;histReset();
   $('#side').innerHTML='';$('#layer').innerHTML='';$('#mClose').classList.remove('on');ui();toast('تم إغلاق الملف');
 }
 $('#bClose').addEventListener('click',()=>{if(!S.pages.length)return;if(stateKey()!==S.savedKey)$('#mClose').classList.add('on');else closeFile()});
@@ -513,6 +515,24 @@ $('#qOk').addEventListener('click',async()=>{
   else{const o={id:uid++,type:'img',x:QR.b.x,y:QR.b.y,w:QR.b.w,h:QR.b.h,src,crisp:true,qr:meta};pg.ov.push(o);S.sel=o.id}
   $('#mQr').classList.remove('on');drawOverlays();toast('تم تغيير رابط الباركود');
 });
+
+const H={undo:[],redo:[],last:null,t:null,busy:false};
+const snap=()=>JSON.stringify({p:S.pages.map(({id,src,idx,base,rot,chosen,ov})=>({id,src,idx,base,rot,chosen,ov:ov.filter(o=>o.type!=='pick')})),c:S.cur});
+function histBtns(){$('#bUndo').disabled=!H.undo.length;$('#bRedo').disabled=!H.redo.length}
+function histReset(){H.undo=[];H.redo=[];H.last=S.pages.length?snap():null;histBtns()}
+function track(){if(H.busy||!S.pages.length||drag)return;const k=snap();if(H.last!==null&&k!==H.last){H.undo.push(H.last);if(H.undo.length>60)H.undo.shift();H.redo=[]}H.last=k;histBtns()}
+const trackSoon=()=>{clearTimeout(H.t);H.t=setTimeout(track,450)};
+['pointerup','keyup','change','click','drop'].forEach(ev=>document.addEventListener(ev,trackSoon,true));
+async function restore(k){
+  H.busy=true;const d=JSON.parse(k);S.pages=d.p;S.cur=Math.min(d.c,S.pages.length-1);S.sel=null;H.last=k;
+  try{await thumbs();await show()}finally{H.busy=false;histBtns()}
+}
+async function undo(){clearTimeout(H.t);track();if(!H.undo.length)return;H.redo.push(H.last);await restore(H.undo.pop())}
+async function redo(){clearTimeout(H.t);track();if(!H.redo.length)return;H.undo.push(H.last);await restore(H.redo.pop())}
+$('#bUndo').addEventListener('click',e=>{e.stopPropagation();undo()});
+$('#bRedo').addEventListener('click',e=>{e.stopPropagation();redo()});
+document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||/TEXTAREA|INPUT/.test(document.activeElement.tagName))return;
+  const k=e.key.toLowerCase();if(k==='z'&&!e.shiftKey||k==='ض'){e.preventDefault();undo()}else if(k==='y'||k==='z'&&e.shiftKey||k==='غ'){e.preventDefault();redo()}});
 // images & signature
 async function placeImage(src){
   const i=await loadImg(src);imgCache[src]=i;const v=S.view;
