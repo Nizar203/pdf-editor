@@ -76,6 +76,7 @@ button,select,input{font:inherit;color:inherit}
 .layer.c-move,.layer.c-qr{cursor:crosshair}
 #qrText{width:100%;min-height:80px;font:16px/1.4 Consolas,monospace;direction:ltr;text-align:left;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .qrrow{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}.qrrow canvas{width:120px;height:120px;border:1px solid var(--line);image-rendering:pixelated;flex:none}.qrrow>div{flex:1;min-width:200px}
+.ov textarea.nw{white-space:pre;overflow:hidden}
 .ov textarea{width:100%;height:100%;border:0;padding:0;margin:0;background:transparent;resize:none;overflow:hidden;font-family:Tahoma,Arial,sans-serif;line-height:1.3;outline:none;display:block}
 .ov.text:hover{outline-color:#c4262e66}.ov.text.sel{outline-color:var(--acc)}.ov.rect:hover,.ov.hl:hover,.ov.img:hover{outline-color:#c4262e66}
 .grip{position:absolute;top:-22px;inset-inline-start:0;height:20px;padding:0 8px;background:var(--acc);color:#fff;font-size:12px;border-radius:4px 4px 0 0;cursor:move;display:none;white-space:nowrap}
@@ -326,7 +327,7 @@ const cur=()=>S.pages[S.cur];
 const find=id=>cur()?.ov.find(o=>o.id===id);
 
 function nodeHTML(o){
-  if(o.type==='text')return `<div class="grip">اسحب</div><textarea dir="${o.dir||'auto'}" spellcheck="false"></textarea><div class="hd"></div>`;
+  if(o.type==='text')return `<div class="grip">اسحب</div><textarea dir="${o.dir||'auto'}" ${o.fit?'wrap="off" class="nw"':''} spellcheck="false"></textarea><div class="hd"></div>`;
   return `<div class="hd"></div>`;
 }
 function styleNode(n,o){
@@ -353,7 +354,12 @@ function props(){
   $('#pBold').classList.toggle('on',!!o.bold);
 }
 
-function fitText(o){const n=nodeOf(o);if(!n)return;const ta=n.querySelector('textarea');const L=$('#layer');ta.style.height='0';const h=ta.scrollHeight;ta.style.height='';o.h=Math.max(o.h,(h+2)/L.clientHeight);n.style.height=o.h*100+'%'}
+function fitText(o){const n=nodeOf(o);if(!n)return;
+  if(o.fit){const V=S.view,lines=(o.text||'').split('\n');_mc.font=`${o.bold?'bold ':''}${o.fit.size}px ${fam(o.font)}`;
+    const need=Math.max(1,...lines.map(l=>_mc.measureText(l).width)),avail=o.w*V.w;
+    const ns=Math.max(o.fit.size*.5,Math.min(o.fit.size,o.fit.size*avail/need));o.size=Math.round(ns*10)/10;
+    if(o.fit.base!=null)o.y=Math.max(0,(o.fit.base-baseOff(o.size,o.bold,o.font))/V.h);
+    o.h=Math.max(o.fit.size*1.3,lines.length*o.size*1.3)/V.h;styleNode(n,o);return}const ta=n.querySelector('textarea');const L=$('#layer');ta.style.height='0';const h=ta.scrollHeight;ta.style.height='';o.h=Math.max(o.h,(h+2)/L.clientHeight);n.style.height=o.h*100+'%'}
 
 const HINTS={edit:'اضغط على أي كلمة في الملف وعدّلها مباشرة. التغطية والخط والمقاس واللون تنضبط تلقائياً.',text:'اضغط في أي مكان في الصفحة واكتب نص جديد.',rect:'اسحب مربع فوق الكلام أو الجزء اللي تبغى تمسحه.',hl:'اسحب فوق الكلام اللي تبغى تظلله.',move:'اضغط على الباركود أو الصورة، أو اسحب مربع حوله، ثم انقله لمكانه الجديد.',qr:'اضغط على باركود QR عشان تعدّل الرابط اللي فيه.',select:'اضغط على أي عنصر أضفته عشان تحركه أو تغيّر حجمه أو تحذفه.'};
 function setHint(){$('#hint').textContent=HINTS[S.tool]||''}
@@ -413,11 +419,11 @@ const endDrag=()=>{if(!drag)return;const o=drag.o;
     let b=o.w>.01&&o.h>.01?{x:o.x,y:o.y,w:o.w,h:o.h}:(S.imgBoxes||[]).filter(q=>o.x>=q.x&&o.x<=q.x+q.w&&o.y>=q.y&&o.y<=q.y+q.h).sort((a,c)=>a.w*a.h-c.w*c.h)[0];
     if(!b){toast('ما لقيت صورة أو باركود هنا. اسحب مربع حوله لتحديده');return}
     if(b.w*b.h>.6){toast('هذي صورة الصفحة كاملة. اسحب مربع حول الباركود بس');return}
-    if(S.tool==='qr')qrRegion(b);else liftRegion(b);return}if(drag.mode==='new'&&(o.w<.005||o.h<.005)){cur().ov=cur().ov.filter(x=>x!==o);S.sel=null;drawOverlays()}else if(o.type==='text')fitText(o);drag=null};
+    if(S.tool==='qr')qrRegion(b);else liftRegion(b);return}if(drag.mode==='new'&&(o.w<.005||o.h<.005)){cur().ov=cur().ov.filter(x=>x!==o);S.sel=null;drawOverlays()}else if(o.type==='text'){if(o.fit&&drag.mode==='move')o.fit.base=o.y*S.view.h+baseOff(o.size,o.bold,o.font);fitText(o)}drag=null};
 $('#layer').addEventListener('pointerup',endDrag);$('#layer').addEventListener('pointercancel',endDrag);
 $('#layer').addEventListener('input',e=>{if(e.target.tagName!=='TEXTAREA')return;const o=find(+e.target.closest('.ov').dataset.id);o.text=e.target.value;fitText(o)});
 
-$('#pSize').addEventListener('input',()=>{const o=find(S.sel);if(o?.type==='text'){o.size=Math.max(5,+$('#pSize').value||14);styleNode(nodeOf(o),o);fitText(o)}});
+$('#pSize').addEventListener('input',()=>{const o=find(S.sel);if(o?.type==='text'){o.size=Math.max(5,+$('#pSize').value||14);if(o.fit)o.fit.size=o.size;styleNode(nodeOf(o),o);fitText(o)}});
 $('#pColor').addEventListener('input',()=>{const o=find(S.sel);if(o){o.color=$('#pColor').value;styleNode(nodeOf(o),o)}});
 $('#pBold').addEventListener('click',()=>{const o=find(S.sel);if(o?.type==='text'){o.bold=!o.bold;styleNode(nodeOf(o),o);props();fitText(o)}});
 const delSel=()=>{const pg=cur();if(!pg||!S.sel)return;pg.ov=pg.ov.filter(o=>o.id!==S.sel);S.sel=null;drawOverlays()};
@@ -444,19 +450,19 @@ function editAt(fx,fy){
   const hit=T.find(t=>px>=t.x-2&&px<=t.x+t.w+2&&py>=t.y-t.s*1.05&&py<=t.y+t.s*.35);
   if(!hit){toast('ما فيه كلام هنا. لإضافة نص جديد اختر "إضافة نص"');return}
   const line=T.filter(t=>Math.abs(t.y-hit.y)<Math.min(t.s,hit.s)*.35&&Math.abs(t.s-hit.s)<.8).sort((a,b)=>a.x-b.x);
-  let i=line.indexOf(hit),a=i,b=i;const g=hit.str.trim().length<=2?hit.s*.6:-1;
+  let i=line.indexOf(hit),a=i,b=i;const g=hit.str.trim().length<=2?hit.s*.6:hit.s*.12;
   while(a>0&&line[a].x-(line[a-1].x+line[a-1].w)<g)a--;
   while(b<line.length-1&&line[b+1].x-(line[b].x+line[b].w)<g)b++;
   const seg=line.slice(a,b+1),rtl=AR.test(seg.map(t=>t.str).join(''));
   const arr=rtl?[...seg].reverse():seg;let text='';
   arr.forEach((t,j)=>{if(j){const pv=arr[j-1];const gap=rtl?pv.x-(t.x+t.w):t.x-(pv.x+pv.w);if(gap>t.s*.2&&!/\s$/.test(text)&&!/^\s/.test(t.str))text+=' '}text+=t.str});
   text=fixAr(text).replace(/\s+/g,' ').trim();
-  const sz=Math.round(hit.s*2)/2,x0=seg[0].x-1,x1=Math.max(...seg.map(t=>t.x+t.w))+1,base=Math.max(...seg.map(t=>t.y)),y0=base-sz*1.0,y1=base+sz*.32;
+  const sz=Math.round(hit.s*2)/2,x0=seg[0].x-sz*.1-1,x1=Math.max(...seg.map(t=>t.x+t.w))+sz*.1+1,base=Math.max(...seg.map(t=>t.y)),y0=base-sz*1.1,y1=base+sz*.4;
   let bold=false,font='Tahoma';try{const f=S.pp.commonObjs.has(hit.fn)&&S.pp.commonObjs.get(hit.fn);bold=!!f&&(/bold|black|heavy/i.test(f.name||'')||!!f.bold);if(f)font=cleanFont(f.name)}catch(e){}
   const c=sampleColors(x0,y0,x1,y1);
-  const rect={id:uid++,type:'rect',x:x0/V.w,y:y0/V.h,w:(x1-x0)/V.w,h:(y1-y0)/V.h,color:c.bg};
-  const ow=Math.min(1,(x1-x0)/V.w+.1);let ox=rtl?x1/V.w-ow:x0/V.w;ox=Math.max(0,Math.min(1-ow,ox));
-  const o={id:uid++,type:'text',x:ox,y:Math.max(0,(base-baseOff(sz,bold,font))/V.h),w:ow,h:.03,text,size:sz,color:c.fg,bold,font,dir:rtl?'rtl':'ltr'};
+  const rb={x:Math.max(0,x0/V.w),y:Math.max(0,y0/V.h),w:(x1-x0)/V.w,h:(y1-y0)/V.h};
+  const rect={id:uid++,type:'rect',...rb,color:ringColor(rb)};
+  const o={id:uid++,type:'text',x:rb.x,y:Math.max(0,(base-baseOff(sz,bold,font))/V.h),w:rb.w,h:sz*1.3/V.h,text,size:sz,color:c.fg,bold,font,dir:rtl?'rtl':'ltr',fit:{size:sz,cover:rect.id,base}};
   pg.ov.push(rect,o);S.sel=o.id;drawOverlays();fitText(o);
   setTimeout(()=>{const ta=nodeOf(o)?.querySelector('textarea');if(ta){ta.focus();ta.select()}},0);
 }
@@ -577,8 +583,8 @@ document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||/TEXTAREA|IN
 const selO=()=>S.sel&&find(S.sel);
 const upd=fn=>{const o=selO();if(!o||o.type!=='text')return;fn(o);styleNode(nodeOf(o),o);fitText(o);props();trackSoon()};
 $('#pFont').addEventListener('change',()=>upd(o=>o.font=$('#pFont').value));
-$('#pMinus').addEventListener('click',()=>upd(o=>o.size=Math.max(5,o.size-.5)));
-$('#pPlus').addEventListener('click',()=>upd(o=>o.size=Math.min(200,o.size+.5)));
+$('#pMinus').addEventListener('click',()=>upd(o=>{o.size=Math.max(5,o.size-.5);if(o.fit)o.fit.size=o.size}));
+$('#pPlus').addEventListener('click',()=>upd(o=>{o.size=Math.min(200,o.size+.5);if(o.fit)o.fit.size=o.size}));
 $('#pAlign').addEventListener('click',e=>{const b=e.target.closest('[data-al]');if(b)upd(o=>o.align=b.dataset.al)});
 $('#zFit').addEventListener('click',()=>{S.zoom=1;show()});
 // menus
@@ -637,7 +643,7 @@ async function overlayCanvas(pg,vw,vh,k,skipText,skipShapes){
       const fs=o.size*k;ctx.font=`${o.bold?'bold ':''}${fs}px ${fam(o.font)}`;ctx.fillStyle=o.color;ctx.textBaseline='alphabetic';const bo=baseOff(fs,o.bold,o.font);
       const rtl=o.dir?o.dir==='rtl':AR.test(o.text);ctx.direction=rtl?'rtl':'ltr';const al=o.align||(rtl?'right':'left');ctx.textAlign=al;
       const ax=al==='center'?x+w/2:al==='right'?x+w:x;
-      wrapLines(ctx,o.text,w).forEach((ln,j)=>ctx.fillText(ln,ax,y+j*fs*1.3+bo));
+      (o.fit?o.text.split('\n'):wrapLines(ctx,o.text,w)).forEach((ln,j)=>ctx.fillText(ln,ax,y+j*fs*1.3+bo));
     }
   }
   return c;
@@ -838,7 +844,7 @@ async function exactPage(pg){
   if(pg.ov.length){const oc=await overlayCanvas(pg,W,H,k,true);bctx.drawImage(oc,0,0)}
   for(const o of pg.ov)if(o.type==='text'&&o.text.trim()){
     const cnv=document.createElement('canvas').getContext('2d');cnv.font=`${o.bold?'bold ':''}${o.size}px ${fam(o.font)}`;
-    wrapLines(cnv,o.text,o.w*W).forEach((ln,j)=>{if(!ln.trim())return;const wd=cnv.measureText(ln).width,rt=AR.test(ln);
+    (o.fit?o.text.split('\n'):wrapLines(cnv,o.text,o.w*W)).forEach((ln,j)=>{if(!ln.trim())return;const wd=cnv.measureText(ln).width,rt=AR.test(ln);
       const al=o.align||(rt?'right':'left');items.push({s:ln,x:al==='center'?o.x*W+(o.w*W-wd)/2:al==='right'?o.x*W+o.w*W-wd:o.x*W,y:o.y*H+o.size*1.15+j*o.size*1.3,w:wd,size:o.size,bold:o.bold,font:o.font||'Tahoma',color:o.color.replace('#','')})});
   }
   // lines -> segments
