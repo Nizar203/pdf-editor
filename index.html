@@ -42,7 +42,26 @@ button,select,input{font:inherit;color:inherit}
 .props label{font-size:13px;color:var(--mute);display:flex;align-items:center;gap:4px}
 .props input[type=number]{width:64px;min-height:36px;padding:0 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:16px}
 .props input[type=color]{width:40px;height:36px;border:1px solid var(--line);border-radius:6px;padding:2px;background:none}
-.hint{padding:8px 14px;background:var(--acc2);color:var(--ink);font-size:14px;border-bottom:1px solid var(--line)}
+.rail{width:92px;flex:none;background:var(--panel);border-inline-end:1px solid var(--line);display:flex;flex-direction:column;gap:4px;padding:8px 6px;overflow-y:auto}
+.rail .t{display:flex;flex-direction:column;align-items:center;gap:4px;min-height:58px;padding:6px 2px;border:1px solid transparent;border-radius:10px;font-size:12px;line-height:1.25;text-align:center}
+.rail .t svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rail .t:hover{background:var(--bg)}.rail .t.on{background:var(--acc2);border-color:var(--acc);color:var(--acc)}
+.rail .sep{height:1px;background:var(--line);margin:4px 6px}
+.bar{display:flex;align-items:center;gap:10px;height:56px;overflow-x:auto;overflow-y:hidden;padding:6px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.bar .hint{font-size:14px;color:var(--mute);flex:1}
+.props{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;flex:none}
+.props select{min-height:38px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:0 8px;font-size:15px;max-width:170px}
+.step{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.step button{width:34px;border:0;background:var(--bg);cursor:pointer;font-size:18px}
+.step input{width:60px;border:0;text-align:center;font-size:16px;background:var(--panel)}
+.clr input{width:40px;height:38px;border:1px solid var(--line);border-radius:8px;padding:2px;background:none;cursor:pointer}
+.pb{min-width:38px;min-height:38px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}
+.pb.on{background:var(--acc2);border-color:var(--acc);color:var(--acc)}#pBold{font-weight:bold}.pb.del{color:var(--acc)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg button{min-height:36px;padding:0 10px;border:0;background:var(--panel);cursor:pointer;font-size:13px}.seg button.on{background:var(--acc2);color:var(--acc);font-weight:bold}
+.menu{position:relative}.pop{position:absolute;top:calc(100% + 4px);inset-inline-start:0;z-index:8;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0003;padding:6px;min-width:240px}
+.pop button{display:block;width:100%;text-align:start;border:0;background:none;padding:10px 12px;border-radius:6px;cursor:pointer;font-size:15px}.pop button:hover:not(:disabled){background:var(--acc2)}.pop button:disabled{opacity:.4;cursor:default}
+.pop small{display:block;color:var(--mute);font-size:12px}.pop hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.b.ic{padding:0 12px}
+@media(max-width:700px){.rail{width:70px}.rail .t{font-size:11px}.bar .hint{display:none}}
 .layer.c-edit{cursor:text}
 .stagewrap{flex:1;overflow:auto;padding:20px}
 .stage{position:relative;margin:0 auto;box-shadow:0 4px 20px #0003;background:#fff}
@@ -85,44 +104,55 @@ button,select,input{font:inherit;color:inherit}
 <body>
 <header class="top">
   <h1>محرر PDF</h1>
-  <button class="b p" id="bOpen">فتح ملفات</button>
-  <button class="b" id="bAdd" disabled>إضافة ملف / دمج</button>
-  <button class="b" id="bClose" disabled>إغلاق الملف</button>
-  <button class="b" id="bBlank" disabled>صفحة فارغة</button>
+  <button class="b p" id="bOpen">فتح ملف</button>
+  <div class="menu"><button class="b" id="mFileBtn" aria-haspopup="true" disabled>ملف ▾</button>
+    <div class="pop" id="mFile" hidden>
+      <button id="bAdd" disabled>إضافة ملف أو دمج ملفات</button>
+      <button id="bBlank" disabled>إضافة صفحة فارغة</button>
+      <button id="bSplit" disabled>حفظ الصفحات المحددة فقط</button>
+      <hr><button id="bClose" disabled>إغلاق الملف</button>
+    </div></div>
+  <div class="menu"><button class="b" id="mConvBtn" aria-haspopup="true" disabled>تحويل ▾</button>
+    <div class="pop" id="mConv" hidden>
+      <button id="bWord" disabled>إلى وورد بنفس الشكل<small>للفواتير والعقود والنماذج</small></button>
+      <button id="bWord2" disabled>إلى وورد كنص مرن<small>لما تكتب كلام كثير</small></button>
+      <button id="bImg" disabled>إلى صور<small>صورة لكل صفحة</small></button>
+    </div></div>
   <span class="sp"></span>
+  <button class="b ic" id="bUndo" disabled title="رجوع (Ctrl+Z)">↶ رجوع</button>
+  <button class="b ic" id="bRedo" disabled title="إعادة (Ctrl+Y)">↷ إعادة</button>
   <button class="b p" id="bSave" disabled>حفظ PDF</button>
-  <button class="b" id="bSplit" disabled>حفظ الصفحات المحددة فقط</button>
-  <button class="b" id="bImg" disabled>تحويل إلى صور</button>
-  <button class="b" id="bWord" disabled>تحويل إلى وورد بنفس الشكل</button>
-  <button class="b" id="bWord2" disabled>وورد كنص مرن</button>
   <input type="file" id="fIn" accept=".pdf,application/pdf,image/*" multiple hidden>
   <input type="file" id="fImg" accept="image/*" hidden>
 </header>
 <div class="main">
-  <aside class="side" id="side" hidden></aside>
+  <nav class="rail" id="tools" hidden aria-label="الأدوات">
+    <button class="t on" data-t="edit" title="تعديل الكلام (E)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>تعديل الكلام</button>
+    <button class="t" data-t="text" title="إضافة نص (T)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M12 5v14M9 19h6"/></svg>إضافة نص</button>
+    <button class="t" data-t="rect" title="تغطية (R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></svg>تغطية ومسح</button>
+    <button class="t" data-t="hl" title="تظليل (H)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M7 16l9-9 3 3-9 9H7z"/></svg>تظليل</button>
+    <span class="sep"></span>
+    <button class="t" data-t="move" title="نقل باركود أو صورة (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 14h6v6h-6zM10 7h7v4M17 11l-2-2M17 11l2-2"/></svg>نقل باركود</button>
+    <button class="t" data-t="qr" title="تعديل رابط الباركود (Q)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></svg>رابط الباركود</button>
+    <span class="sep"></span>
+    <button class="t" id="bSig" title="توقيع (S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c3-6 5-9 7-9s-1 8 2 8 3-5 5-5 2 3 4 3M3 21h18"/></svg>توقيع</button>
+    <button class="t" id="bPic" title="إدراج صورة (I)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01"/></svg>صورة أو ختم</button>
+    <button class="t" data-t="select" title="تحديد وتحريك (V)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l12 8-5 1.5L9.5 18z"/></svg>تحريك</button>
+  </nav>
   <section class="work">
-    <div class="tools" id="tools" hidden>
-      <button class="t" id="bUndo" disabled title="Ctrl+Z">↶ رجوع</button>
-      <button class="t" id="bRedo" disabled title="Ctrl+Y">↷ إعادة</button>
-      <button class="t on" data-t="edit">تعديل الكلام</button>
-      <button class="t" data-t="text">إضافة نص</button>
-      <button class="t" data-t="select">تحريك</button>
-      <button class="t" data-t="rect">تغطية / مسح</button>
-      <button class="t" data-t="move">نقل باركود أو صورة</button>
-      <button class="t" data-t="qr">تعديل رابط الباركود</button>
-      <button class="t" data-t="hl">تظليل</button>
-      <button class="t" id="bSig">توقيع</button>
-      <button class="t" id="bPic">إدراج صورة</button>
-      <div class="props" id="props" style="visibility:hidden">
-        <label id="lSize">الحجم <input type="number" id="pSize" min="5" max="200" value="14"></label>
-        <label>اللون <input type="color" id="pColor" value="#000000"></label>
-        <button class="t" id="pBold">عريض</button>
-        <button class="t" id="pDel">حذف العنصر</button>
+    <div class="bar" id="bar" hidden>
+      <div class="hint" id="hint">اضغط على أي كلمة في الملف وعدّلها مباشرة. التغطية والخط والمقاس واللون تنضبط تلقائياً.</div>
+      <div class="props" id="props" hidden>
+        <select id="pFont" title="نوع الخط"></select>
+        <div class="step" id="lSize"><button id="pMinus" aria-label="تصغير الخط">−</button><input type="number" id="pSize" min="5" max="200" step="0.5" value="14" title="مقاس الخط"><button id="pPlus" aria-label="تكبير الخط">+</button></div>
+        <label class="clr" title="اللون"><input type="color" id="pColor" value="#000000"></label>
+        <button class="pb" id="pBold" title="عريض">B</button>
+        <div class="seg" id="pAlign"><button data-al="right" title="محاذاة يمين">يمين</button><button data-al="center" title="توسيط">وسط</button><button data-al="left" title="محاذاة يسار">يسار</button></div>
+        <button class="pb del" id="pDel" title="حذف (Delete)">حذف</button>
       </div>
       <span class="sp"></span>
-      <div class="zoom"><button class="t" id="zOut" aria-label="تصغير">−</button><span id="zLbl">100%</span><button class="t" id="zIn" aria-label="تكبير">+</button></div>
+      <div class="zoom"><button class="pb" id="zOut" aria-label="تصغير">−</button><span id="zLbl">100%</span><button class="pb" id="zIn" aria-label="تكبير">+</button><button class="pb" id="zFit" title="ملاءمة العرض">ملاءمة</button></div>
     </div>
-    <div class="hint" id="hint" hidden>اضغط على أي كلمة في الملف وعدّلها مباشرة. التغطية والخط والمقاس واللون تنضبط تلقائياً.</div>
     <div class="stagewrap" id="wrap">
       <div class="empty" id="empty">
         <h2>عدّل ملفات PDF وحوّلها</h2>
@@ -132,6 +162,7 @@ button,select,input{font:inherit;color:inherit}
       <div class="stage" id="stage" hidden><canvas id="cv" dir="ltr"></canvas><div class="layer" id="layer"></div></div>
     </div>
   </section>
+  <aside class="side" id="side" hidden></aside>
 </div>
 <div class="modal" id="mSig"><div class="box">
   <h3>ارسم توقيعك</h3>
@@ -168,9 +199,12 @@ const S={sources:[],pages:[],cur:-1,tool:'edit',sel:null,zoom:1,view:null,task:n
 const imgCache={};
 let uid=1;
 const FONT='Tahoma, Arial, sans-serif';
+const FONTS=['Tahoma','Arial','Times New Roman','Traditional Arabic','Simplified Arabic','Sakkal Majalla','Arabic Typesetting','Segoe UI','Calibri','Courier New'];
+const fam=f=>`"${f||'Tahoma'}", ${FONT}`;
+function fontOpts(cur){const sel=$('#pFont');const list=[...new Set([cur,...(S.docFonts||[]),...FONTS])].filter(Boolean);sel.innerHTML=list.map(f=>`<option ${f===cur?'selected':''} style="font-family:'${f}'">${f}</option>`).join('')}
 const AR=/[؀-ۿ]/;
 const _mc=document.createElement('canvas').getContext('2d');
-function baseOff(fs,bold){_mc.font=`${bold?'bold ':''}${fs}px ${FONT}`;const m=_mc.measureText('Hgجـ');const A=m.fontBoundingBoxAscent??fs*.95,D=m.fontBoundingBoxDescent??fs*.25;return (fs*1.3-(A+D))/2+A}
+function baseOff(fs,bold,font){_mc.font=`${bold?'bold ':''}${fs}px ${fam(font)}`;const m=_mc.measureText('Hgجـ');const A=m.fontBoundingBoxAscent??fs*.95,D=m.fontBoundingBoxDescent??fs*.25;return (fs*1.3-(A+D))/2+A}
 
 const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),3200)};
 const busy=on=>$('#busy').classList.toggle('on',!!on);
@@ -230,8 +264,8 @@ async function addFiles(files){
 
 function ui(){
   const has=S.pages.length>0;
-  ['#bAdd','#bClose','#bBlank','#bSave','#bSplit','#bImg','#bWord','#bWord2'].forEach(s=>$(s).disabled=!has);
-  $('#side').hidden=$('#tools').hidden=$('#stage').hidden=!has;$('#hint').hidden=!has||S.tool!=='edit';$('#empty').hidden=has;
+  ['#bAdd','#bClose','#bBlank','#bSave','#bSplit','#bImg','#bWord','#bWord2','#mFileBtn','#mConvBtn'].forEach(s=>$(s).disabled=!has);
+  $('#side').hidden=$('#tools').hidden=$('#bar').hidden=$('#stage').hidden=!has;$('#empty').hidden=has;setHint();
 }
 
 async function renderPage(pg,width){
@@ -270,7 +304,7 @@ async function show(){
   const pg=S.pages[S.cur];if(!pg)return;
   const p=await S.sources[pg.src].doc.getPage(pg.idx+1);const r=norm(pg.base+pg.rot);
   const v1=p.getViewport({scale:1,rotation:r});
-  const avail=Math.max(200,$('#wrap').clientWidth-40);
+  const avail=Math.max(200,$('#wrap').clientWidth-44);
   const s=Math.min(avail/v1.width,1.6)*S.zoom;const dpr=window.devicePixelRatio||1;
   const v=p.getViewport({scale:s*dpr,rotation:r});const cv=$('#cv');
   if(S.task)try{S.task.cancel()}catch(e){}
@@ -283,6 +317,7 @@ async function show(){
   const ctx=cv.getContext('2d');ctx.direction='ltr';ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
   S.task=p.render({canvasContext:ctx,viewport:v});
   try{await S.task.promise}catch(e){}
+  try{const fs=new Set();for(const t of S.tsz||[]){const f=p.commonObjs.has(t.fn)&&p.commonObjs.get(t.fn);if(f&&f.name)fs.add(cleanFont(f.name))}S.docFonts=[...fs]}catch(e){}
   S.imgBoxes=[];pageImages(p,v1,v1.width,v1.height).then(bx=>{if(cur()===pg)S.imgBoxes=bx.map(b=>({x:b.x0/v1.width,y:b.y0/v1.height,w:(b.x1-b.x0)/v1.width,h:(b.y1-b.y0)/v1.height}))}).catch(()=>{});
   $('#zLbl').textContent=Math.round(S.zoom*100)+'%';
 }
@@ -298,7 +333,7 @@ function styleNode(n,o){
   Object.assign(n.style,{left:o.x*100+'%',top:o.y*100+'%',width:o.w*100+'%',height:o.h*100+'%'});
   if(o.type==='rect')n.style.background=o.color;
   if(o.type==='img')n.style.backgroundImage=`url(${o.src})`;
-  if(o.type==='text'){const ta=n.querySelector('textarea');ta.style.fontSize=o.size*S.view.s+'px';ta.style.color=o.color;ta.style.fontWeight=o.bold?'bold':'normal';if(ta.value!==o.text)ta.value=o.text}
+  if(o.type==='text'){const ta=n.querySelector('textarea');ta.style.fontSize=o.size*S.view.s+'px';ta.style.fontFamily=fam(o.font);ta.style.textAlign=o.align||'';ta.style.color=o.color;ta.style.fontWeight=o.bold?'bold':'normal';if(ta.value!==o.text)ta.value=o.text}
   n.classList.toggle('sel',S.sel===o.id);
 }
 function drawOverlays(){
@@ -310,16 +345,20 @@ const nodeOf=o=>$(`#layer .ov[data-id="${o.id}"]`);
 
 function select(id){S.sel=id;document.querySelectorAll('#layer .ov').forEach(n=>n.classList.toggle('sel',+n.dataset.id===id));props()}
 function props(){
-  const o=S.sel&&find(S.sel);const v=(el,on)=>el.style.visibility=on?'visible':'hidden';v($('#props'),o);if(!o)return;
-  const t=o.type==='text';v($('#lSize'),t);v($('#pBold'),t);
-  v($('#pColor').parentElement,t||o.type==='rect');
-  if(t)$('#pSize').value=o.size;if(o.color)$('#pColor').value=o.color;
+  const o=S.sel&&find(S.sel);$('#props').hidden=!o;$('#hint').hidden=!!o;if(!o)return;
+  const t=o.type==='text';['#lSize','#pBold','#pFont','#pAlign'].forEach(q=>$(q).hidden=!t);
+  $('#pColor').parentElement.hidden=!(t||o.type==='rect');
+  if(t){$('#pSize').value=o.size;fontOpts(o.font||'Tahoma');const al=o.align||(o.dir==='ltr'?'left':o.dir==='rtl'||AR.test(o.text)?'right':'left');document.querySelectorAll('#pAlign button').forEach(b=>b.classList.toggle('on',b.dataset.al===al))}
+  if(o.color)$('#pColor').value=o.color;
   $('#pBold').classList.toggle('on',!!o.bold);
 }
 
 function fitText(o){const n=nodeOf(o);if(!n)return;const ta=n.querySelector('textarea');const L=$('#layer');ta.style.height='0';const h=ta.scrollHeight;ta.style.height='';o.h=Math.max(o.h,(h+2)/L.clientHeight);n.style.height=o.h*100+'%'}
 
-$('#tools').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;S.tool=b.dataset.t;document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===b));$('#layer').className='layer c-'+S.tool;$('#hint').hidden=S.tool!=='edit'});
+const HINTS={edit:'اضغط على أي كلمة في الملف وعدّلها مباشرة. التغطية والخط والمقاس واللون تنضبط تلقائياً.',text:'اضغط في أي مكان في الصفحة واكتب نص جديد.',rect:'اسحب مربع فوق الكلام أو الجزء اللي تبغى تمسحه.',hl:'اسحب فوق الكلام اللي تبغى تظلله.',move:'اضغط على الباركود أو الصورة، أو اسحب مربع حوله، ثم انقله لمكانه الجديد.',qr:'اضغط على باركود QR عشان تعدّل الرابط اللي فيه.',select:'اضغط على أي عنصر أضفته عشان تحركه أو تغيّر حجمه أو تحذفه.'};
+function setHint(){$('#hint').textContent=HINTS[S.tool]||''}
+function setTool(t){S.tool=t;document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x.dataset.t===t));$('#layer').className='layer c-'+t;setHint();if(S.sel&&t!=='select'){S.sel=null;document.querySelectorAll('#layer .ov.sel').forEach(n=>n.classList.remove('sel'));props()}}
+$('#tools').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(b)setTool(b.dataset.t)});
 
 // pointer interactions
 let drag=null;
@@ -413,11 +452,11 @@ function editAt(fx,fy){
   arr.forEach((t,j)=>{if(j){const pv=arr[j-1];const gap=rtl?pv.x-(t.x+t.w):t.x-(pv.x+pv.w);if(gap>t.s*.2&&!/\s$/.test(text)&&!/^\s/.test(t.str))text+=' '}text+=t.str});
   text=fixAr(text).replace(/\s+/g,' ').trim();
   const sz=Math.round(hit.s*2)/2,x0=seg[0].x-1,x1=Math.max(...seg.map(t=>t.x+t.w))+1,base=Math.max(...seg.map(t=>t.y)),y0=base-sz*1.0,y1=base+sz*.32;
-  let bold=false;try{const f=S.pp.commonObjs.has(hit.fn)&&S.pp.commonObjs.get(hit.fn);bold=!!f&&(/bold|black|heavy/i.test(f.name||'')||!!f.bold)}catch(e){}
+  let bold=false,font='Tahoma';try{const f=S.pp.commonObjs.has(hit.fn)&&S.pp.commonObjs.get(hit.fn);bold=!!f&&(/bold|black|heavy/i.test(f.name||'')||!!f.bold);if(f)font=cleanFont(f.name)}catch(e){}
   const c=sampleColors(x0,y0,x1,y1);
   const rect={id:uid++,type:'rect',x:x0/V.w,y:y0/V.h,w:(x1-x0)/V.w,h:(y1-y0)/V.h,color:c.bg};
   const ow=Math.min(1,(x1-x0)/V.w+.1);let ox=rtl?x1/V.w-ow:x0/V.w;ox=Math.max(0,Math.min(1-ow,ox));
-  const o={id:uid++,type:'text',x:ox,y:Math.max(0,(base-baseOff(sz,bold))/V.h),w:ow,h:.03,text,size:sz,color:c.fg,bold,dir:rtl?'rtl':'ltr'};
+  const o={id:uid++,type:'text',x:ox,y:Math.max(0,(base-baseOff(sz,bold,font))/V.h),w:ow,h:.03,text,size:sz,color:c.fg,bold,font,dir:rtl?'rtl':'ltr'};
   pg.ov.push(rect,o);S.sel=o.id;drawOverlays();fitText(o);
   setTimeout(()=>{const ta=nodeOf(o)?.querySelector('textarea');if(ta){ta.focus();ta.select()}},0);
 }
@@ -440,7 +479,7 @@ async function liftRegion(b){
     const pad=1/V.w;
     pg.ov.push({id:uid++,type:'rect',x:Math.max(0,b.x-pad),y:Math.max(0,b.y-pad),w:b.w+2*pad,h:b.h+2*pad,color:ringColor(b)});
     const o={id:uid++,type:'img',x:b.x,y:b.y,w:b.w,h:b.h,src,crisp:true};pg.ov.push(o);S.sel=o.id;
-    S.tool='select';document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x.dataset.t==='select'));$('#hint').hidden=true;
+    setTool('select');
     drawOverlays();toast('اسحب الباركود لمكانه الجديد، وكبّره أو صغّره من الدائرة الحمراء');
   }finally{busy(0)}
 }
@@ -533,13 +572,33 @@ $('#bUndo').addEventListener('click',e=>{e.stopPropagation();undo()});
 $('#bRedo').addEventListener('click',e=>{e.stopPropagation();redo()});
 document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||/TEXTAREA|INPUT/.test(document.activeElement.tagName))return;
   const k=e.key.toLowerCase();if(k==='z'&&!e.shiftKey||k==='ض'){e.preventDefault();undo()}else if(k==='y'||k==='z'&&e.shiftKey||k==='غ'){e.preventDefault();redo()}});
+
+// property controls
+const selO=()=>S.sel&&find(S.sel);
+const upd=fn=>{const o=selO();if(!o||o.type!=='text')return;fn(o);styleNode(nodeOf(o),o);fitText(o);props();trackSoon()};
+$('#pFont').addEventListener('change',()=>upd(o=>o.font=$('#pFont').value));
+$('#pMinus').addEventListener('click',()=>upd(o=>o.size=Math.max(5,o.size-.5)));
+$('#pPlus').addEventListener('click',()=>upd(o=>o.size=Math.min(200,o.size+.5)));
+$('#pAlign').addEventListener('click',e=>{const b=e.target.closest('[data-al]');if(b)upd(o=>o.align=b.dataset.al)});
+$('#zFit').addEventListener('click',()=>{S.zoom=1;show()});
+// menus
+function closeMenus(){document.querySelectorAll('.pop').forEach(m=>m.hidden=true)}
+[['#mFileBtn','#mFile'],['#mConvBtn','#mConv']].forEach(([b,m])=>$(b).addEventListener('click',e=>{e.stopPropagation();const h=$(m).hidden;closeMenus();$(m).hidden=!h}));
+document.addEventListener('click',e=>{if(!e.target.closest('.menu'))closeMenus();else if(e.target.closest('.pop button'))setTimeout(closeMenus,0)});
+// tool shortcuts
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey||/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName)||!S.pages.length||$('.modal.on'))return;
+  const k={e:'edit',ث:'edit',t:'text',ف:'text',r:'rect',ق:'rect',h:'hl',ا:'hl',m:'move',ة:'move',q:'qr',ض:'qr',v:'select',ر:'select'}[e.key.toLowerCase()];
+  if(k){e.preventDefault();setTool(k)}else if(e.key==='s'||e.key==='س'){e.preventDefault();$('#bSig').click()}else if(e.key==='i'||e.key==='ه'){e.preventDefault();$('#bPic').click()}
+  else if(e.key==='Escape'){S.sel=null;drawOverlays()}
+});
 // images & signature
 async function placeImage(src){
   const i=await loadImg(src);imgCache[src]=i;const v=S.view;
   const w=.3,h=w*v.w/v.h*(i.naturalHeight/i.naturalWidth);
   const o={id:uid++,type:'img',x:.35,y:Math.max(0,.5-h/2),w,h:Math.min(h,1),src};
   cur().ov.push(o);S.sel=o.id;drawOverlays();
-  S.tool='select';document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x.dataset.t==='select'));$('#layer').className='layer c-select';
+  setTool('select');
   toast('اسحب العنصر لمكانه، وكبّره من الدائرة الحمراء');
 }
 $('#bPic').addEventListener('click',()=>$('#fImg').click());
@@ -575,9 +634,10 @@ async function overlayCanvas(pg,vw,vh,k,skipText,skipShapes){
     else if(o.type==='hl'){ctx.save();ctx.globalAlpha=.4;ctx.fillStyle='#ffe600';ctx.fillRect(x,y,w,h);ctx.restore()}
     else if(o.type==='img'){const i=imgCache[o.src]||(imgCache[o.src]=await loadImg(o.src));ctx.save();if(o.crisp)ctx.imageSmoothingEnabled=false;ctx.drawImage(i,x,y,w,h);ctx.restore()}
     else if(o.type==='text'&&o.text.trim()&&!skipText){
-      const fs=o.size*k;ctx.font=`${o.bold?'bold ':''}${fs}px ${FONT}`;ctx.fillStyle=o.color;ctx.textBaseline='alphabetic';const bo=baseOff(fs,o.bold);
-      const rtl=o.dir?o.dir==='rtl':AR.test(o.text);ctx.direction=rtl?'rtl':'ltr';ctx.textAlign=rtl?'right':'left';
-      wrapLines(ctx,o.text,w).forEach((ln,j)=>ctx.fillText(ln,rtl?x+w:x,y+j*fs*1.3+bo));
+      const fs=o.size*k;ctx.font=`${o.bold?'bold ':''}${fs}px ${fam(o.font)}`;ctx.fillStyle=o.color;ctx.textBaseline='alphabetic';const bo=baseOff(fs,o.bold,o.font);
+      const rtl=o.dir?o.dir==='rtl':AR.test(o.text);ctx.direction=rtl?'rtl':'ltr';const al=o.align||(rtl?'right':'left');ctx.textAlign=al;
+      const ax=al==='center'?x+w/2:al==='right'?x+w:x;
+      wrapLines(ctx,o.text,w).forEach((ln,j)=>ctx.fillText(ln,ax,y+j*fs*1.3+bo));
     }
   }
   return c;
@@ -721,8 +781,8 @@ async function pageXml(pg){
 
 function cleanFont(n){
   n=(n||'').replace(/^[A-Z]{6}\+/,'').split(/[-,]/)[0].replace(/(PSMT|MT|PS)$/,'').replace(/([a-z])([A-Z])/g,'$1 $2').trim();
-  if(!n||/^g_|^f\d|dejavu|liberation sans/i.test(n))return 'Tahoma';
-  if(/^times/i.test(n))return 'Times New Roman';if(/liberation serif/i.test(n))return 'Times New Roman';
+  const nn=n.replace(/\s/g,'');if(!n||/^g_|^f\d|dejavu|liberationsans|^noto/i.test(nn))return 'Tahoma';
+  if(/^times/i.test(n))return 'Times New Roman';if(/liberationserif/i.test(nn))return 'Times New Roman';
   if(/^courier/i.test(n))return 'Courier New';if(/^helvetica|^arial/i.test(n))return 'Arial';
   return n;
 }
@@ -777,9 +837,9 @@ async function exactPage(pg){
   // user overlays: shapes into background, text as frames
   if(pg.ov.length){const oc=await overlayCanvas(pg,W,H,k,true);bctx.drawImage(oc,0,0)}
   for(const o of pg.ov)if(o.type==='text'&&o.text.trim()){
-    const cnv=document.createElement('canvas').getContext('2d');cnv.font=`${o.bold?'bold ':''}${o.size}px ${FONT}`;
+    const cnv=document.createElement('canvas').getContext('2d');cnv.font=`${o.bold?'bold ':''}${o.size}px ${fam(o.font)}`;
     wrapLines(cnv,o.text,o.w*W).forEach((ln,j)=>{if(!ln.trim())return;const wd=cnv.measureText(ln).width,rt=AR.test(ln);
-      items.push({s:ln,x:rt?o.x*W+o.w*W-wd:o.x*W,y:o.y*H+o.size*1.15+j*o.size*1.3,w:wd,size:o.size,bold:o.bold,font:'Tahoma',color:o.color.replace('#','')})});
+      const al=o.align||(rt?'right':'left');items.push({s:ln,x:al==='center'?o.x*W+(o.w*W-wd)/2:al==='right'?o.x*W+o.w*W-wd:o.x*W,y:o.y*H+o.size*1.15+j*o.size*1.3,w:wd,size:o.size,bold:o.bold,font:o.font||'Tahoma',color:o.color.replace('#','')})});
   }
   // lines -> segments
   items.sort((a,b)=>a.y-b.y);const lines=[];
